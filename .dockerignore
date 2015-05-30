@@ -1,0 +1,4 @@
+# vsftpd env files
+*.env
+# Ignore the git stuff
+.git
