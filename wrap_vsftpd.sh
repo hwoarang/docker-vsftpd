@@ -4,18 +4,20 @@
 
 vsftpddir="/etc/vsftpd"
 
-# First, create the user database
-user=${FTPUSER-dockerftp}
-pass=${FTPPASS-dockerftp}
 echo "Creating the vsftpd PAM module"
 echo "auth required pam_userdb.so crypt=hash db=${vsftpddir}/vsftpd_virt_users" > /etc/pam.d/vsftpd
 echo "account required pam_userdb.so crypt=hash db=${vsftpddir}/vsftpd_virt_users" >> /etc/pam.d/vsftpd
 
-echo "Creating the user database"
-echo -e "${user}\n${pass}" > /tmp/userdb
-db_load -T -t hash -f /tmp/userdb ${vsftpddir}/vsftpd_virt_users.db || \
-	{ echo "Failed to create the ftp user database"; exit 1; }
-rm /tmp/userdb
+if [[ ! -e ${vsftpddir}/vsftpd_virt_users.db ]]; then
+	# First, create the user database
+	user=${FTPUSER-dockerftp}
+	pass=${FTPPASS-dockerftp}
+	echo "Creating the user database"
+	echo -e "${user}\n${pass}" > /tmp/userdb
+	db_load -T -t hash -f /tmp/userdb ${vsftpddir}/vsftpd_virt_users.db || \
+		{ echo "Failed to create the ftp user database"; exit 1; }
+	rm /tmp/userdb
+fi
 
 # Create (or clear) the log file
 echo "Creating the logfile"
@@ -26,10 +28,12 @@ echo > /var/log/vsftpd.log
 [[ ! -d /var/ftp/pub ]] && mkdir -p /var/ftp/pub
 
 # We don't care about the certificate details. Just make sure we do have one
-echo "Creating the certificate"
-openssl req -x509 -nodes -days 3650 -newkey rsa:4096 \
-	-keyout ${vsftpddir}/vsftpd.pem -out ${vsftpddir}/vsftpd.pem \
-	-batch || { echo "Failed to create the vsftpd certificate"; exit 1; }
+if [[ ! -e ${vsftpddir}/vsftpd.pem ]]; then
+	echo "Creating the certificate"
+	openssl req -x509 -nodes -days 3650 -newkey rsa:4096 \
+		-keyout ${vsftpddir}/vsftpd.pem -out ${vsftpddir}/vsftpd.pem \
+		-batch || { echo "Failed to create the vsftpd certificate"; exit 1; }
+fi
 
 # Do the final replacements on the template file
 echo "Preparing the configuration file"
